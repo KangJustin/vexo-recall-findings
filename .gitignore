@@ -6,3 +6,17 @@ __pycache__/
 *.pyc
 *.ogg
 .DS_Store
+# the downloaded voice model (about 80 MB)
+models/
+
+# evaluation audio and results (regenerated)
+eval/corpus/
+eval/results/
+# the wearer's voice baseline (a voiceprint) stays on this laptop
+profiles/
+# the speaker service's Python environment
+.venv-speaker/
+
+# local tool settings and caches
+.impeccable/
+.DS_Store

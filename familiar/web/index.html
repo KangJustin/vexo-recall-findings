@@ -63,6 +63,17 @@
   .toast { position:fixed; left:50%; bottom:20px; transform:translate(-50%,24px); opacity:0; transition:all .25s; background:var(--ink); color:#fff; padding:12px 16px; border-radius:16px; max-width:min(520px,calc(100vw - 24px)); font-size:15px; pointer-events:none; }
   .toast.show { opacity:1; transform:translate(-50%,0); }
   .toast b { color:#8DAAFF; }
+  .line .tag { font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:none; color:var(--muted); margin-left:6px; }
+  .line .tag.warn { color:var(--amber); }
+  .line.unclear .by { color:var(--muted) !important; }
+  .line.unclear .tx { color:var(--muted); }
+  .fix { font-size:14px; display:flex; flex-wrap:wrap; gap:6px; align-items:center; padding:6px 0; border-bottom:1px solid var(--line); }
+  .fix:last-child { border-bottom:0; }
+  .fix button { min-height:32px; padding:0 10px; font-size:13px; }
+  .pills { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .ask { background:var(--amber-bg); border:1px solid #F1D79A; border-radius:20px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+  .ask .q { font-weight:700; color:var(--amber); }
+  .ask .why { font-size:14px; color:var(--amber); }
   @media (prefers-reduced-motion: reduce) { .toast { transition:none; } }
 </style>
 </head>
@@ -70,16 +81,25 @@
 <main>
   <header>
     <div class="brand"><span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/></svg></span>Vexo Recall</div>
-    <span id="conn" class="pill dot off">Connecting…</span>
+    <span class="pills"><span id="attribution" class="pill" hidden></span><span id="assist" class="pill" hidden></span><span id="conn" class="pill dot off">Connecting…</span></span>
   </header>
 
   <section class="now" id="now" aria-live="polite"></section>
+
+  <section id="asks" aria-live="polite" style="display:flex;flex-direction:column;gap:10px"></section>
 
   <h2>In this conversation</h2>
   <section class="card" id="people"><div class="empty" style="color:var(--muted);padding:12px 0">Nobody yet. Start talking.</div></section>
 
   <h2>What was said</h2>
   <section class="log" id="log" aria-live="polite"><div class="note">The transcript appears here.</div></section>
+
+  <section id="fixes" class="card" hidden></section>
+
+  <section id="notesBox" hidden>
+    <h2>Notes</h2>
+    <div class="card" id="notes" style="padding:12px 16px"></div>
+  </section>
 
   <details>
     <summary>Try a line without the band</summary>
@@ -103,6 +123,8 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const post = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
 const colorOf = (p) => COLORS[p.index % COLORS.length];
+const SOURCE = {regex:'rules', gemini:'Gemini', voice:'voice match', typed:'typed by you'};
+const sourceOf = (p) => p.source ? SOURCE[p.source] || p.source : '';
 
 function statusPill(p) {
   if (p.status === 'confirmed') return '<span class="pill">Confirmed by you</span>';
@@ -125,7 +147,8 @@ function renderNow() {
   h += '<div class="who">' + esc(p.display) + (p.is_me && p.name ? ' <span style="font-size:18px;color:var(--soft)">(you)</span>' : '') + '</div>';
   if (p.name) {
     const label = p.status === 'confirmed' ? 'Name set by you' : p.status === 'heard' ? 'Voice match inside this conversation' : 'Possible name';
-    h += '<div class="sub">' + label + (p.evidence && p.status !== 'confirmed' ? ' · ' + esc(p.evidence) : '') + '</div>';
+    h += '<div class="sub">' + label + (p.evidence && p.status !== 'confirmed' ? ' · ' + esc(p.evidence) : '') +
+         (sourceOf(p) ? ' · source: ' + esc(sourceOf(p)) : '') + '</div>';
   } else if (!p.is_me) {
     h += '<div class="sub">Haven’t heard a name yet. Add one below.</div>';
   }
@@ -154,25 +177,91 @@ function renderPeople() {
   el.innerHTML = others.map(p => {
     const merge = others.length > 1 ? '<select data-merge="' + p.id + '" aria-label="Same person as"><option value="">Same as…</option>' +
       others.filter(o => o.id !== p.id).map(o => '<option value="' + o.id + '">' + esc(o.display) + '</option>').join('') + '</select>' : '';
-    const sub = p.name ? (p.status === 'possible' ? 'Possible name' : p.status === 'confirmed' ? 'Confirmed' : 'Heard') : 'No name yet';
+    const sub = p.name ? (p.status === 'possible' ? 'Possible name' : p.status === 'confirmed' ? 'Confirmed' : 'Heard') +
+      (p.source && p.source !== 'typed' ? ' (' + esc(sourceOf(p)) + ')' : '') : 'No name yet';
     return '<div class="person' + (p.id === state.now ? ' active' : '') + '" data-pick="' + p.id + '">' +
       '<div class="avatar" style="background:' + colorOf(p) + '" aria-hidden="true">' + esc((p.display || '?').slice(0,1).toUpperCase()) + '</div>' +
       '<div class="meta"><div class="nm">' + esc(p.display) + '</div><div class="sb">' + sub + ' · ' + p.lines + ' line' + (p.lines === 1 ? '' : 's') + '</div></div>' + merge + '</div>';
   }).join('');
 }
 
+function nameOf(byId, id) { return id == null ? 'Unclear who' : (byId[id] ? byId[id].display : 'Voice ' + id); }
+
 function renderLog() {
   const el = $('log');
-  if (!state || (!state.log.length && !state.interim)) return;
+  const interim = state ? (state.interim || []) : [];
+  if (!state || (!state.log.length && !interim.length)) return;
   const byId = Object.fromEntries(state.people.map(p => [p.id, p]));
   const lines = state.log.slice(-30).map(l => ({...l, interim:false}));
-  if (state.interim) lines.push({speaker:state.interim.speaker, text:state.interim.text, interim:true});
+  for (const piece of interim) lines.push({speaker:piece.speaker, text:piece.text, interim:true});   // replaced each update
   const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
   el.innerHTML = lines.map(l => {
-    const p = byId[l.speaker] || {display:'?', index:0};
-    return '<div class="line' + (l.interim ? ' interim' : '') + '"><div class="by" style="color:' + colorOf(p) + '">' + esc(p.display) + '</div><div class="tx">' + esc(l.text) + '</div></div>';
+    const p = byId[l.speaker] || {display: l.interim ? 'New voice' : nameOf(byId, l.speaker), index:0};
+    const unclear = !l.interim && l.speaker == null;
+    let tags = '';
+    if (unclear) tags += '<span class="tag warn">' + (l.candidates && l.candidates.length ? 'maybe ' +
+      l.candidates.map(c => esc(nameOf(byId, c))).join(' or ') : 'speaker unresolved') + '</span>';
+    if (l.status === 'voice') tags += '<span class="tag">by voice match</span>';
+    if (l.status === 'corrected') tags += '<span class="tag">corrected</span>';
+    if (l.overlaps && l.overlaps.length) tags += '<span class="tag warn">overlapping speech</span>';
+    return '<div class="line' + (l.interim ? ' interim' : '') + (unclear ? ' unclear' : '') + '"><div class="by" style="color:' +
+      colorOf(p) + '">' + esc(unclear ? 'Unclear who' : p.display) + tags + '</div><div class="tx">' + esc(l.text) + '</div></div>';
   }).join('');
   if (stick) el.scrollTop = el.scrollHeight;
+}
+
+function renderFixes() {
+  const el = $('fixes');
+  const props = state.proposals || [], done = state.corrections || [];
+  if (!props.length && !done.length) { el.hidden = true; return; }
+  const byId = Object.fromEntries(state.people.map(p => [p.id, p]));
+  const lineText = (id) => { const l = state.log.find(x => x.id === id); return l ? l : null; };
+  let h = '<h2 style="margin:6px 0">Who said it? Suggestions to check</h2>';
+  for (const p of props) {
+    const l = lineText(p.line);
+    if (!l || !l.words) continue;
+    const words = l.words.slice(p.words[0], p.words[1]).map(w => w[0]).join(' ');
+    const src = p.engine === 'gemini_review' ? 'Gemini review (unverified)' : 'Second pass (' + esc(p.engine) + ')';
+    h += '<div class="fix"><span><b>“' + esc(words) + '”</b> → ' + esc(p.to == null ? 'unclear who' : nameOf(byId, p.to)) +
+      ' <span class="note">' + src + (p.confidence != null ? ', speaker confidence ' + Math.round(p.confidence * 100) + '%' : '') +
+      '</span></span><button data-act="propApply" data-id="' + p.id + '">Apply</button><button class="link" data-act="propDismiss" data-id="' +
+      p.id + '">Dismiss</button></div>';
+  }
+  for (const c of done) h += '<div class="fix"><span class="note">Corrected by ' + esc(c.engine) + '</span><button data-act="revert" data-id="' +
+    c.id + '">Undo</button></div>';
+  el.innerHTML = h; el.hidden = false;
+}
+
+function renderNotes() {
+  const n = state.notes, box = $('notesBox');
+  if (!n || (!n.topics.length && !n.mentioned_names.length && !n.follow_ups.length)) { box.hidden = true; return; }
+  const byId = Object.fromEntries(state.people.map(p => [p.id, p]));
+  let h = n.topics.length ? '<div class="chips" style="margin-bottom:8px">' + n.topics.map(t => '<span class="pill">' + esc(t) + '</span>').join('') + '</div>' : '';
+  if (n.mentioned_names.length) h += '<div class="note">Names mentioned (not who anyone is): ' +
+    n.mentioned_names.map(m => esc(m.name)).join(', ') + '</div>';
+  for (const f of n.follow_ups) h += '<div style="margin-top:6px">• ' + esc(f.text) + ' <span class="note">— ' +
+    esc(f.owner == null ? 'unattributed' : nameOf(byId, f.owner)) + '</span></div>';
+  $('notes').innerHTML = h; box.hidden = false;
+}
+
+function renderAsks() {
+  const el = $('asks');
+  const byId = Object.fromEntries((state.people || []).map(p => [p.id, p]));
+  el.innerHTML = (state.suggestions || []).filter(s => byId[s.voices[0]] && byId[s.voices[1]]).map(s => {
+    const a = byId[s.voices[0]], b = byId[s.voices[1]];
+    return '<div class="ask"><div class="q">Same person? ' + esc(a.display) + ' and ' + esc(b.display) + '</div>' +
+      (s.reason ? '<div class="why">' + (s.source === 'voice' ? 'Voice match' : 'Gemini') + ': ' + esc(s.reason) + '</div>' : '') +
+      '<div class="row"><button class="primary" data-act="same" data-id="' + s.id + '">Yes, join them</button>' +
+      '<button data-act="notsame" data-id="' + s.id + '">No, two people</button></div></div>';
+  }).join('');
+  const pill = $('assist');
+  if (state.assist === 'on') { pill.hidden = false; pill.className = 'pill'; pill.textContent = 'Gemini on'; }
+  else if (state.assist === 'rules') { pill.hidden = false; pill.className = 'pill'; pill.textContent = 'Rules only'; }
+  else pill.hidden = true;
+  const att = $('attribution');
+  if (state.attribution == null) att.hidden = true;
+  else { att.hidden = false; att.className = 'pill' + (state.attribution === 'available' ? '' : ' warn');
+         att.textContent = state.attribution === 'available' ? 'Speaker AI on' : 'Speaker AI unavailable'; }
 }
 
 function toast(html) {
@@ -181,11 +270,13 @@ function toast(html) {
 }
 
 function render() {
-  renderNow(); renderPeople(); renderLog();
+  renderNow(); renderPeople(); renderLog(); renderAsks(); renderFixes(); renderNotes();
   for (const ev of state.events) {
     if (ev.id > lastEvent) {
       lastEvent = ev.id;
-      if (!firstState) toast('Picked up a name: <b>' + esc(ev.name) + '</b><br><span style="color:#C9D6FF;font-size:13px">' + esc(ev.why) + '</span>');
+      if (firstState) continue;
+      const head = ev.kind === 'merge' ? 'Joined two voices: <b>' + esc(ev.display) + '</b>' : 'Picked up a name: <b>' + esc(ev.name) + '</b>';
+      toast(head + '<br><span style="color:#C9D6FF;font-size:13px">' + esc(ev.why) + '</span>');
     }
   }
   firstState = false;
@@ -218,6 +309,9 @@ document.addEventListener('click', (e) => {
     else if (act === 'clear') post('/api/clear', {speaker:sp});
     else if (act === 'me') post('/api/me', {speaker:sp, me:b.dataset.me === 'true'});
     else if (act === 'follow') { focus = null; render(); }
+    else if (act === 'propApply' || act === 'propDismiss') post('/api/proposal', {id:+b.dataset.id, apply:act === 'propApply'});
+    else if (act === 'revert') post('/api/revert', {id:+b.dataset.id});
+    else if (act === 'same' || act === 'notsame') post('/api/suggestion', {id:+b.dataset.id, same:act === 'same'});
     return;
   }
   if (e.target.id === 'reset') { post('/api/reset'); focus = null; lastEvent = 0; firstState = true; return; }
