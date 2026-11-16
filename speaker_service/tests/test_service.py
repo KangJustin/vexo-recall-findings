@@ -20,8 +20,12 @@ from speaker_service.tests.fakes import VOICES, fake_models, profile_for, silenc
 SR = 16000
 
 
+_NO_PROFILE = os.path.join(tempfile.gettempdir(), "vexo-speaker-tests-no-profile.json")
+
+
 def settings(**kw):
     s = Settings()
+    s.profile = _NO_PROFILE                     # never the real enrolled wearer on this machine
     s.wearer_yes, s.wearer_no, s.wearer_min_seconds, s.max_lag, s.latency = 0.8, 0.3, 1.0, 30.0, 1.0
     for k, v in kw.items():
         setattr(s, k, v)
@@ -252,6 +256,7 @@ class Protocol(unittest.TestCase):
         import speaker_service.app as service
         service.models = fake_models(settings())
         service.settings.latency, service.settings.wearer_min_seconds = 1.0, 1.0
+        service.settings.profile = _NO_PROFILE
         with TestClient(service.app) as client:
             self.assertEqual(client.get("/health").json(), {"ok": True})
             self.assertEqual(client.get("/ready").status_code, 200)

@@ -45,7 +45,8 @@ app = FastAPI(title="Vexo speaker service")
 
 @app.on_event("startup")
 def _startup():
-    threading.Thread(target=models.load, name="load-models", daemon=True).start()
+    if models.status == "not loaded":                 # never reload models that are already up
+        threading.Thread(target=models.load, name="load-models", daemon=True).start()
 
 
 @app.get("/health")

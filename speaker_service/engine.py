@@ -157,7 +157,11 @@ class Session:
         self.profile = None
         if profile is not None:
             v = np.asarray(profile["embedding"], dtype=np.float64)
-            self.profile = v / np.linalg.norm(v)
+            dim = models.specs.get("embedding_dimension")
+            if dim is not None and len(v) != dim:          # made with another model: never compared
+                print("Wearer profile ignored: %d numbers, the embedding model gives %d. Enrol again." % (len(v), dim))
+            else:
+                self.profile = v / np.linalg.norm(v)
         self.sr = settings.sample_rate
         self.duration, self.step = models.duration, settings.step
         self.latency = models.config.latency

@@ -67,7 +67,7 @@ class FakeEmbedding:
 def fake_models(settings, duration=5.0):
     from speaker_service.engine import Models
     m = Models(settings, segmentation_loader=lambda: FakeSegmentation(), embedding_loader=lambda: FakeEmbedding())
-    m.specs = {"duration": duration}
+    m.specs = {"duration": duration, "embedding_dimension": FakeEmbedding.dimension}
     return m.load()
 
 
