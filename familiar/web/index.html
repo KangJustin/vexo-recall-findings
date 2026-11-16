@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexo Recall</title>
+<style>
+  :root {
+    --ink:#0B1B3F; --cobalt:#1E4BD2; --deep:#12307F; --muted:#5A6886; --mist:#F4F7FD; --tint:#E8EFFE;
+    --red:#C8261D; --line:#E2E8F3; --edge:#7C89A6; --soft:#C9D6FF; --amber-bg:#FFF3D6; --amber:#7A4A00;
+    --v0:#1E4BD2; --v1:#0B6E63; --v2:#8A3FB8; --v3:#B3541E;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--mist); color:var(--ink); font:16px/1.4 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:20px 16px 48px; display:flex; flex-direction:column; gap:14px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:700; font-size:20px; letter-spacing:-0.02em; }
+  .logo { width:34px; height:34px; border-radius:10px; background:var(--cobalt); display:grid; place-items:center; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:999px; font-size:13px; font-weight:600; background:var(--tint); color:var(--deep); white-space:nowrap; }
+  .pill.warn { background:var(--amber-bg); color:var(--amber); }
+  .pill.dot::before { content:""; width:8px; height:8px; border-radius:50%; background:var(--cobalt); }
+  .pill.off::before { background:var(--edge); }
+  h2 { margin:0; font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+
+  .now { background:var(--deep); color:#fff; border-radius:22px; padding:18px; display:flex; flex-direction:column; gap:12px; min-height:210px; }
+  .now .tag { font-size:13px; font-weight:600; color:var(--soft); display:flex; justify-content:space-between; gap:8px; }
+  .now .who { font-size:34px; font-weight:700; letter-spacing:-0.02em; line-height:1.1; overflow-wrap:anywhere; }
+  .now .sub { color:var(--soft); font-size:15px; }
+  .now .quote { font-size:18px; font-weight:600; line-height:1.35; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { background:rgba(255,255,255,.14); color:#fff; border-radius:999px; padding:5px 11px; font-size:14px; }
+  .now hr { border:0; border-top:1px solid rgba(255,255,255,.25); margin:2px 0; width:100%; }
+  .empty { color:var(--soft); font-size:17px; }
+
+  form.name { display:flex; gap:8px; }
+  input[type=text] { flex:1; min-width:0; height:48px; border-radius:14px; border:1.5px solid var(--edge); padding:0 14px; font:inherit; font-size:17px; color:var(--ink); background:#fff; }
+  button { font:inherit; font-weight:600; cursor:pointer; border-radius:14px; min-height:44px; padding:0 16px; border:1.5px solid var(--edge); background:#fff; color:var(--ink); }
+  button.primary { background:var(--cobalt); border-color:var(--cobalt); color:#fff; }
+  button.onDark { background:transparent; border-color:var(--soft); color:#fff; }
+  button.link { border:0; background:transparent; color:var(--cobalt); padding:0 8px; }
+  button.danger { color:var(--red); border-color:var(--red); }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline:3px solid #8DAAFF; outline-offset:2px; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+  .card { background:#fff; border:1px solid var(--line); border-radius:20px; padding:6px 16px; }
+  .person { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .person:last-child { border-bottom:0; }
+  .avatar { width:40px; height:40px; border-radius:50%; flex:none; display:grid; place-items:center; color:#fff; font-weight:700; }
+  .person .meta { flex:1; min-width:0; }
+  .person .nm { font-weight:600; overflow-wrap:anywhere; }
+  .person .sb { font-size:13px; color:var(--muted); }
+  .person.active { background:linear-gradient(0deg,transparent,transparent); }
+  .person.active .nm::after { content:" · talking"; color:var(--cobalt); font-weight:600; font-size:13px; }
+  select { height:40px; border-radius:12px; border:1.5px solid var(--edge); background:#fff; color:var(--ink); font:inherit; font-size:14px; max-width:130px; }
+
+  .log { background:#fff; border:1px solid var(--line); border-radius:20px; padding:14px 16px; display:flex; flex-direction:column; gap:10px; max-height:300px; overflow:auto; }
+  .line .by { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .line .tx { font-size:16px; }
+  .line.interim .tx { color:var(--muted); font-style:italic; }
+  details { background:#fff; border:1px solid var(--line); border-radius:20px; padding:12px 16px; }
+  summary { cursor:pointer; font-weight:600; color:var(--deep); }
+  .note { font-size:13px; color:var(--muted); }
+  .toast { position:fixed; left:50%; bottom:20px; transform:translate(-50%,24px); opacity:0; transition:all .25s; background:var(--ink); color:#fff; padding:12px 16px; border-radius:16px; max-width:min(520px,calc(100vw - 24px)); font-size:15px; pointer-events:none; }
+  .toast.show { opacity:1; transform:translate(-50%,0); }
+  .toast b { color:#8DAAFF; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition:none; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="brand"><span class="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 9v6M19 11v2"/></svg></span>Vexo Recall</div>
+    <span id="conn" class="pill dot off">Connecting…</span>
+  </header>
+
+  <section class="now" id="now" aria-live="polite"></section>
+
+  <h2>In this conversation</h2>
+  <section class="card" id="people"><div class="empty" style="color:var(--muted);padding:12px 0">Nobody yet. Start talking.</div></section>
+
+  <h2>What was said</h2>
+  <section class="log" id="log" aria-live="polite"><div class="note">The transcript appears here.</div></section>
+
+  <details>
+    <summary>Try a line without the band</summary>
+    <form id="say" class="row" style="margin-top:10px">
+      <label for="sayWho" class="note">Voice</label>
+      <select id="sayWho"><option value="0">A</option><option value="1" selected>B</option><option value="2">C</option><option value="3">D</option></select>
+      <input id="sayText" type="text" placeholder="Hi, I'm Maya" aria-label="What this voice says" style="flex:1 1 200px">
+      <button class="primary" type="submit">Send</button>
+    </form>
+    <div class="row" style="margin-top:8px"><button id="reset" type="button">Start a new conversation</button></div>
+  </details>
+
+  <p class="note">Names come from what people say, so they can be wrong: fix any of them. Voices are only matched inside this conversation, and nothing is saved when you close this page.</p>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const COLORS = ['var(--v0)', 'var(--v1)', 'var(--v2)', 'var(--v3)'];
+let state = null, focus = null, lastEvent = 0, firstState = true, toastTimer = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const post = (path, body) => fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body || {})});
+const colorOf = (p) => COLORS[p.index % COLORS.length];
+
+function statusPill(p) {
+  if (p.status === 'confirmed') return '<span class="pill">Confirmed by you</span>';
+  if (p.status === 'heard') return '<span class="pill">Heard them say it</span>';
+  if (p.status === 'possible') return '<span class="pill warn">Possible — please check</span>';
+  return '<span class="pill warn">Needs a name</span>';
+}
+
+function renderNow() {
+  const el = $('now');
+  if (!state || !state.people.length) {
+    el.innerHTML = '<div class="tag"><span>Listening</span></div><div class="who">Ready when you are</div><div class="empty">When someone speaks, you’ll see who it is here. If they introduce themselves, the name fills in on its own.</div>';
+    return;
+  }
+  const id = focus != null && state.people.some(p => p.id === focus) ? focus : state.now;
+  const p = state.people.find(x => x.id === id) || state.people[0];
+  const talking = p.id === state.now;
+  let h = '<div class="tag"><span>' + (talking ? 'Talking now' : 'Selected') + '</span>' +
+          (talking ? '' : '<button class="link onDarkLink" style="color:#fff;min-height:0" data-act="follow">Follow speaker</button>') + '</div>';
+  h += '<div class="who">' + esc(p.display) + (p.is_me && p.name ? ' <span style="font-size:18px;color:var(--soft)">(you)</span>' : '') + '</div>';
+  if (p.name) {
+    const label = p.status === 'confirmed' ? 'Name set by you' : p.status === 'heard' ? 'Voice match inside this conversation' : 'Possible name';
+    h += '<div class="sub">' + label + (p.evidence && p.status !== 'confirmed' ? ' · ' + esc(p.evidence) : '') + '</div>';
+  } else if (!p.is_me) {
+    h += '<div class="sub">Haven’t heard a name yet. Add one below.</div>';
+  }
+  if (p.clues.length) h += '<div class="chips">' + p.clues.map(c => '<span class="chip">' + esc(c) + '</span>').join('') + '</div>';
+  if (p.last_text) h += '<hr><div><div class="sub">Latest</div><div class="quote">“' + esc(p.last_text) + '”</div></div>';
+  h += '<form class="name" data-speaker="' + p.id + '"><label for="nameInput" style="position:absolute;left:-9999px">Name for ' + esc(p.display) + '</label>' +
+       '<input id="nameInput" type="text" autocomplete="off" placeholder="' + (p.name ? 'Change name' : 'Type their name') + '">' +
+       '<button class="primary" type="submit">' + (p.name ? 'Update' : 'Save') + '</button></form>';
+  h += '<div class="row">';
+  if (p.name && p.status !== 'confirmed') h += '<button class="onDark" data-act="confirm" data-speaker="' + p.id + '">Yes, that’s ' + esc(p.name) + '</button>';
+  if (p.name) h += '<button class="onDark" data-act="clear" data-speaker="' + p.id + '">Not ' + esc(p.name) + '?</button>';
+  h += '<button class="onDark" data-act="me" data-speaker="' + p.id + '" data-me="' + (!p.is_me) + '">' + (p.is_me ? 'Not me' : 'That’s me') + '</button></div>';
+  // keep what is being typed
+  const old = el.querySelector('#nameInput');
+  const typed = old ? old.value : '', hadFocus = old && document.activeElement === old;
+  el.innerHTML = h;
+  const input = el.querySelector('#nameInput');
+  if (input && typed && el.dataset.who == String(p.id)) { input.value = typed; if (hadFocus) input.focus(); }
+  el.dataset.who = String(p.id);
+}
+
+function renderPeople() {
+  const el = $('people');
+  if (!state || !state.people.length) return;
+  const others = state.people;
+  el.innerHTML = others.map(p => {
+    const merge = others.length > 1 ? '<select data-merge="' + p.id + '" aria-label="Same person as"><option value="">Same as…</option>' +
+      others.filter(o => o.id !== p.id).map(o => '<option value="' + o.id + '">' + esc(o.display) + '</option>').join('') + '</select>' : '';
+    const sub = p.name ? (p.status === 'possible' ? 'Possible name' : p.status === 'confirmed' ? 'Confirmed' : 'Heard') : 'No name yet';
+    return '<div class="person' + (p.id === state.now ? ' active' : '') + '" data-pick="' + p.id + '">' +
+      '<div class="avatar" style="background:' + colorOf(p) + '" aria-hidden="true">' + esc((p.display || '?').slice(0,1).toUpperCase()) + '</div>' +
+      '<div class="meta"><div class="nm">' + esc(p.display) + '</div><div class="sb">' + sub + ' · ' + p.lines + ' line' + (p.lines === 1 ? '' : 's') + '</div></div>' + merge + '</div>';
+  }).join('');
+}
+
+function renderLog() {
+  const el = $('log');
+  if (!state || (!state.log.length && !state.interim)) return;
+  const byId = Object.fromEntries(state.people.map(p => [p.id, p]));
+  const lines = state.log.slice(-30).map(l => ({...l, interim:false}));
+  if (state.interim) lines.push({speaker:state.interim.speaker, text:state.interim.text, interim:true});
+  const stick = el.scrollTop + el.clientHeight >= el.scrollHeight - 40;
+  el.innerHTML = lines.map(l => {
+    const p = byId[l.speaker] || {display:'?', index:0};
+    return '<div class="line' + (l.interim ? ' interim' : '') + '"><div class="by" style="color:' + colorOf(p) + '">' + esc(p.display) + '</div><div class="tx">' + esc(l.text) + '</div></div>';
+  }).join('');
+  if (stick) el.scrollTop = el.scrollHeight;
+}
+
+function toast(html) {
+  const t = $('toast'); t.innerHTML = html; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4200);
+}
+
+function render() {
+  renderNow(); renderPeople(); renderLog();
+  for (const ev of state.events) {
+    if (ev.id > lastEvent) {
+      lastEvent = ev.id;
+      if (!firstState) toast('Picked up a name: <b>' + esc(ev.name) + '</b><br><span style="color:#C9D6FF;font-size:13px">' + esc(ev.why) + '</span>');
+    }
+  }
+  firstState = false;
+}
+
+function connect() {
+  const es = new EventSource('/events');
+  es.onopen = () => { $('conn').className = 'pill dot'; $('conn').textContent = 'Listening'; };
+  es.onmessage = (m) => { state = JSON.parse(m.data); render(); };
+  es.onerror = () => { $('conn').className = 'pill dot off'; $('conn').textContent = 'Reconnecting…'; };
+}
+
+document.addEventListener('submit', (e) => {
+  const f = e.target;
+  if (f.classList.contains('name')) {
+    e.preventDefault();
+    const v = f.querySelector('input').value.trim();
+    if (v) { post('/api/name', {speaker:+f.dataset.speaker, name:v}); f.querySelector('input').value = ''; }
+  } else if (f.id === 'say') {
+    e.preventDefault();
+    const t = $('sayText').value.trim();
+    if (t) { post('/api/say', {speaker:+$('sayWho').value, text:t}); $('sayText').value = ''; }
+  }
+});
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (b) {
+    const act = b.dataset.act, sp = +b.dataset.speaker;
+    if (act === 'confirm') { const p = state.people.find(x => x.id === sp); post('/api/name', {speaker:sp, name:p.name}); }
+    else if (act === 'clear') post('/api/clear', {speaker:sp});
+    else if (act === 'me') post('/api/me', {speaker:sp, me:b.dataset.me === 'true'});
+    else if (act === 'follow') { focus = null; render(); }
+    return;
+  }
+  if (e.target.id === 'reset') { post('/api/reset'); focus = null; lastEvent = 0; firstState = true; return; }
+  const row = e.target.closest('[data-pick]');
+  if (row && !e.target.closest('select')) { focus = +row.dataset.pick; render(); }
+});
+document.addEventListener('change', (e) => {
+  const s = e.target.closest('select[data-merge]');
+  if (s && s.value) { post('/api/merge', {from:+s.dataset.merge, to:+s.value}); s.value = ''; }
+});
+connect();
+</script>
+</body>
+</html>

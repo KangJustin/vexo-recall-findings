@@ -1,0 +1,8 @@
+# the Vexo Open kit is cloned next to our code, not part of it
+vexo-open-kit/
+# keys never go into git
+.env
+__pycache__/
+*.pyc
+*.ogg
+.DS_Store
