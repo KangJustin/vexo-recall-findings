@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vexo Voice</title>
+<style>
+  :root {
+    --ink:#0B1B3F; --cobalt:#1E4BD2; --deep:#12307F; --muted:#5A6886; --mist:#F4F7FD; --tint:#E8EFFE;
+    --line:#E2E8F3; --soft:#C9D6FF; --quiet:#C5CEDF; --unsure:#E3B341;
+    --p1:#0B6E63; --p2:#8A3FB8; --p3:#B3541E; --p4:#4F6D7A;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--mist); color:var(--ink); font:16px/1.4 Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width:560px; margin:0 auto; padding:20px 16px 48px; display:flex; flex-direction:column; gap:14px; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .brand { font-weight:700; font-size:20px; letter-spacing:-0.02em; }
+  .pill { padding:5px 10px; border-radius:999px; font-size:13px; font-weight:600; background:var(--tint); color:var(--deep); white-space:nowrap; }
+  h2 { margin:0; font-size:13px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .now { background:var(--deep); color:#fff; border-radius:22px; padding:22px 18px; display:flex; flex-direction:column; gap:14px; align-items:center; text-align:center; }
+  .dot { width:96px; height:96px; border-radius:50%; display:grid; place-items:center; font-size:38px; font-weight:700; transition:background .15s; }
+  .who { font-size:34px; font-weight:700; letter-spacing:-0.02em; }
+  .sub { color:var(--soft); font-size:15px; min-height:21px; }
+  .meter { width:100%; max-width:320px; height:10px; border-radius:999px; background:rgba(255,255,255,.18); position:relative; overflow:hidden; }
+  .meter > i { position:absolute; left:0; top:0; bottom:0; background:#8DAAFF; border-radius:999px; transition:width .15s; }
+  .meter > b { position:absolute; top:-3px; bottom:-3px; width:2px; background:#fff; }
+  .card { background:#fff; border:1px solid var(--line); border-radius:20px; padding:14px 16px; }
+  .timeline { display:flex; height:28px; border-radius:10px; overflow:hidden; background:var(--line); }
+  .timeline > span { height:100%; }
+  .axis { display:flex; justify-content:space-between; font-size:12px; color:var(--muted); margin-top:4px; }
+  .legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:10px; font-size:14px; }
+  .legend span::before { content:""; display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; background:var(--c); }
+  .note { font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header><div class="brand">Vexo Voice</div><span id="conn" class="pill">Connecting…</span></header>
+  <section class="now" aria-live="polite">
+    <div class="dot" id="dot">·</div>
+    <div class="who" id="who">Listening</div>
+    <div class="sub" id="sub"></div>
+    <div class="meter" id="meter" title="How much the last second sounds like you"><i id="bar" style="width:0"></i><b id="mark" style="left:50%"></b></div>
+  </section>
+  <h2>Last 30 seconds</h2>
+  <section class="card">
+    <div class="timeline" id="timeline"></div>
+    <div class="axis"><span>30 s ago</span><span>now</span></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <p class="note">Decided from the sound alone, on this laptop, about four times a second. No transcript and nothing is sent anywhere. “You” comes from your enrolled voice baseline; other voices are learned during this session and forgotten when it ends.</p>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const COLORS = {you:'#1E4BD2', silence:'var(--quiet)', unclear:'var(--unsure)'};
+const PCOL = ['var(--p1)', 'var(--p2)', 'var(--p3)', 'var(--p4)'];
+const colorOf = (s) => COLORS[s] || (s && s[0] === 'p' ? PCOL[(parseInt(s.slice(1), 10) - 1) % PCOL.length] : 'var(--quiet)');
+const nameOf = (s) => s === 'you' ? 'You' : s === 'silence' ? 'Quiet' : s === 'unclear' ? 'Not sure yet' : (s && s[0] === 'p' ? 'Person ' + s.slice(1) : s);
+const initial = (s) => s === 'you' ? 'Y' : s === 'silence' ? '·' : s === 'unclear' ? '?' : s.slice(1);
+
+function render(st) {
+  const s = st.speaker;
+  $('dot').style.background = colorOf(s);
+  $('dot').textContent = initial(s);
+  $('who').textContent = nameOf(s);
+  const you = st.scores && st.scores.you;
+  $('sub').textContent = !st.has_baseline ? 'No voice baseline yet: run --enroll to be recognised as You'
+    : (you == null ? '' : 'Sounds like you: ' + you.toFixed(2));
+  const pct = (v) => Math.max(0, Math.min(100, (v + 0.2) / 1.0 * 100));   // -0.2 .. 0.8
+  $('bar').style.width = you == null ? '0' : pct(you) + '%';
+  $('mark').style.display = st.threshold == null ? 'none' : 'block';
+  if (st.threshold != null) $('mark').style.left = pct(st.threshold) + '%';
+  // timeline: the last 30 s from the list of changes
+  const end = st.elapsed, start = end - 30, h = st.history || [];
+  const parts = [];
+  for (let i = 0; i < h.length; i++) {
+    const a = Math.max(h[i][0], start), b = i + 1 < h.length ? h[i + 1][0] : end;
+    if (b > start && b > a) parts.push([h[i][1], (b - a) / 30 * 100]);
+  }
+  const used = parts.reduce((x, p) => x + p[1], 0);
+  $('timeline').innerHTML = (used < 100 ? '<span style="width:' + (100 - used) + '%;background:var(--line)"></span>' : '') +
+    parts.map(p => '<span title="' + nameOf(p[0]) + '" style="width:' + p[1] + '%;background:' + colorOf(p[0]) + '"></span>').join('');
+  const people = ['you'].concat(st.people || []);
+  $('legend').innerHTML = people.filter(p => p !== 'you' || st.has_baseline)
+    .map(p => '<span style="--c:' + colorOf(p) + '">' + nameOf(p) + '</span>').join('');
+}
+
+async function poll() {
+  try {
+    const r = await fetch('/voice-state', {cache: 'no-store'});
+    render(await r.json());
+    $('conn').textContent = 'Listening';
+  } catch (e) {
+    $('conn').textContent = 'Stopped';
+  }
+  setTimeout(poll, 250);
+}
+poll();
+</script>
+</body>
+</html>
