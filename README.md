@@ -1,3 +1,7 @@
+> **Archived experiment (Vexo Hacks, Nov 2026).** Live "who said what" on a Vexo wristband did not work well
+> enough on real voices to demo, and the team moved on to Familiar. **Read [FINDINGS.md](FINDINGS.md) first**:
+> what was built, what was measured, and what to try next. The rest of this README is how to run it.
+
 # Vexo Recall — who is talking, in the moment
 
 Hackathon demo. The band's mic goes to Deepgram with speaker labels (diarization). Names come from what people say
